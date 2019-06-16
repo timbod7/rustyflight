@@ -1,4 +1,4 @@
-#[derive(Default)]
+#[derive(Default,Clone)]
 pub struct SbusFrame {
     pub channels: [u16; 16],
     pub channel17: bool,

@@ -1,0 +1,42 @@
+[package]
+name = "sbus-rtfm-demo"
+version = "0.0.1"
+authors = ["Tim Docker<tim@dockerz.net>"]
+description = "SBUS test"
+keywords = ["arm", "cortex-m"]
+categories = ["embedded", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/timbod7/..."
+
+[dependencies.stm32f4xx-hal]
+path = "/home/timd/personal/projects/stm-f4/repos-3rd-party/stm32f4xx-hal"
+features = ["stm32f407", "rt"]
+
+[dependencies.stm32f4]
+version = "0.6.0"
+features = ["stm32f407", "rt"]
+
+[dependencies.embedded-hal]
+version = "0.2.2"
+
+[dependencies.cortex-m-rtfm]
+version = "0.4.3"
+
+[dependencies.cortex-m]
+version = "0.5.8"
+
+[dependencies.cortex-m-rt]
+version = "0.6.7"
+
+[dependencies.panic-itm]
+version = "0.4.0"
+
+[dependencies.cast]
+version = "0.2.2"
+default-features = false
+
+[dependencies.nb]
+version = "0.1.1"
+
+[dependencies.rflibs]
+path = "../rflibs"
