@@ -1,0 +1,11 @@
+[package]
+name = "rflibs"
+version = "0.1.0"
+authors = ["Tim Docker <tim@dockerz.net>"]
+edition = "2018"
+
+[dependencies]
+
+[features]
+std = []
+
