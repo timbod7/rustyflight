@@ -49,3 +49,17 @@ pub fn process_char(state: &mut SbusReadState, c: u8) -> bool {
         c == 0
     }
 }
+
+#[cfg(feature="std")]
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn starts_empty() {
+      let ss = SbusReadState::default();
+      assert_eq!(ss.bytei, 0);
+  }
+
+  // TODO(implement tests)
+}
