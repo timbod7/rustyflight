@@ -7,6 +7,7 @@ extern crate rtfm;
 extern crate panic_itm;
 extern crate stm32f4;
 extern crate stm32f4xx_hal as hal;
+extern crate embedded_hal;
 
 #[macro_use(block)]
 extern crate nb;
@@ -16,7 +17,6 @@ extern crate rflibs;
 use rtfm::app;
 use hal::serial;
 use hal::prelude::*;
-use cortex_m::iprintln;
 use rflibs::sbus;
 
 pub mod uarts;
@@ -24,10 +24,12 @@ pub mod uarts;
 
 #[app(device = stm32f4::stm32f407)]
 const APP: () = {
+    static mut sbus_state: sbus::SbusReadState = ();
+    static mut sbus_frame: sbus::SbusFrame = ();
+
     static mut serial2 : uarts::Serial2 = ();
     static mut serial3 : uarts::Serial3 = ();
     static mut itm : stm32f4::stm32f407::ITM = ();
-    static mut sbus_state: sbus::SbusReadState = ();
 
     #[init]
     fn init() {
@@ -63,44 +65,32 @@ const APP: () = {
         let txpin = gpioc.pc10.into_alternate_af7();
         let rxpin = gpioc.pc11.into_alternate_af7();
         let mut serial3_ = serial::Serial::usart3(device.USART3, (txpin, rxpin), config, clocks).unwrap();
+        serial3_.listen(serial::Event::Txe);
         serial3_.listen(serial::Event::Rxne);
 
         serial2 = serial2_;
         serial3 = serial3_;
         itm = core.ITM;
         sbus_state = sbus::SbusReadState::default();
+        sbus_frame = sbus::SbusFrame::default();
     }
 
-    #[interrupt(resources=[serial2,sbus_state], spawn=[process], priority=2)]
+    #[interrupt(resources=[serial2,sbus_state,sbus_frame], spawn=[], priority=2)]
     fn USART2() {
-        let s  = &mut resources.serial2;
-
-        if s.is_idle() {
-            sbus::process_idle(&mut resources.sbus_state);
-        }
-        let received = block!(s.read());
-        match received {
-            Ok(c) => {
-                let complete = sbus::process_char(&mut resources.sbus_state, c);
-                if complete {
-                    spawn.process().unwrap();
-                }
-            },
-            Err(_e) => {
-                sbus::process_idle(&mut resources.sbus_state);
-            },
+        match rx_sbus(resources.serial2, &mut resources.sbus_state) {
+          Some(frame) => {
+            *resources.sbus_frame = frame;
+          },
+          None => ()
         }
     }
 
-    #[task(resources=[itm,sbus_state])]
-    fn process() {
-        let frame = resources.sbus_state.lock(|sbus_state| {
-            sbus_state.frame.clone()
-        });
-        iprintln!(&mut resources.itm.stim[0], "{} {}", frame.channels[0],  frame.channels[1]);
+    #[interrupt(resources=[serial3], spawn=[], priority=2)]
+    fn USART3() {
+      serial_echo(resources.serial3)
     }
 
-    #[idle(resources=[itm])]
+    #[idle(resources=[])]
     fn idle() -> ! {
         loop {
         }
@@ -111,3 +101,39 @@ const APP: () = {
         fn USART1();
     }
 };
+
+fn rx_sbus(s: &mut uarts::SerialRW, sbus_state: &mut sbus::SbusReadState) -> Option<sbus::SbusFrame> {
+  if s.is_idle() {
+    sbus::process_idle(sbus_state);
+  }
+  let received = block!(s.read());
+  match received {
+    Ok(c) => {
+      let complete = sbus::process_char(sbus_state, c);
+      if complete {
+        Some(sbus_state.frame.clone())
+      } else {
+        None
+      }
+    },
+    Err(_e) => {
+      sbus::process_idle(sbus_state);
+      None
+    },
+  }
+}
+
+
+fn serial_echo(s: &mut uarts::SerialRW) {
+  match block!(s.read()) {
+    Ok(c) => {
+      match block!(s.write(c)) {
+        Ok(()) => (),
+        Err(_e) => ()
+      }
+    },
+    Err(_e) => {
+    },
+  }
+}
+
