@@ -22,7 +22,8 @@ use rflibs::sbus;
 
 #[app(device = stm32f4::stm32f407)]
 const APP: () = {
-    static mut serial  : serial::Serial<stm32f4::stm32f407::USART2,(hal::gpio::gpiod::PD5<hal::gpio::Alternate<hal::gpio::AF7>>, hal::gpio::gpiod::PD6<hal::gpio::Alternate<hal::gpio::AF7>>)> = ();
+    static mut serial2 : serial::Serial<stm32f4::stm32f407::USART2,(hal::gpio::gpiod::PD5<hal::gpio::Alternate<hal::gpio::AF7>>, hal::gpio::gpiod::PD6<hal::gpio::Alternate<hal::gpio::AF7>>)> = ();
+    static mut serial3 : serial::Serial<stm32f4::stm32f407::USART3,(hal::gpio::gpioc::PC10<hal::gpio::Alternate<hal::gpio::AF7>>, hal::gpio::gpioc::PC11<hal::gpio::Alternate<hal::gpio::AF7>>)> = ();
     static mut itm : stm32f4::stm32f407::ITM = ();
     static mut sbus_state: sbus::SbusReadState = ();
 
@@ -45,20 +46,33 @@ const APP: () = {
             .parity_even()
             .wordlength_9()
             .stopbits(serial::config::StopBits::STOP2);
-        let mut serial_ = serial::Serial::usart2(device.USART2, (txpin, rxpin), config, clocks).unwrap();
-        serial_.listen(serial::Event::Rxne);
+        let mut serial2_ = serial::Serial::usart2(device.USART2, (txpin, rxpin), config, clocks).unwrap();
+        serial2_.listen(serial::Event::Rxne);
 
-        serial = serial_;
-	itm = core.ITM;
+        // USART3 at PC10 (TX) and PC11 (RX)
+        let gpioc = device.GPIOC.split();
+        let txpin = gpioc.pc10.into_alternate_af7();
+        let rxpin = gpioc.pc11.into_alternate_af7();
+        let config = serial::config::Config::default()
+            .baudrate(19_200.bps())
+            .parity_even()
+            .wordlength_9()
+            .stopbits(serial::config::StopBits::STOP2);
+        let mut serial3_ = serial::Serial::usart3(device.USART3, (txpin, rxpin), config, clocks).unwrap();
+        serial3_.listen(serial::Event::Rxne);
+
+        serial2 = serial2_;
+        serial3 = serial3_;
+        itm = core.ITM;
         sbus_state = sbus::SbusReadState::default();
     }
 
-    #[interrupt(resources=[serial,sbus_state], spawn=[process], priority=2)]
+    #[interrupt(resources=[serial2,sbus_state], spawn=[process], priority=2)]
     fn USART2() {
-        if resources.serial.is_idle() {
+        if resources.serial2.is_idle() {
             sbus::process_idle(&mut resources.sbus_state);
         }
-        let received = block!(resources.serial.read());
+        let received = block!(resources.serial2.read());
         match received {
             Ok(c) => {
                 let complete = sbus::process_char(&mut resources.sbus_state, c);
@@ -80,7 +94,7 @@ const APP: () = {
         iprintln!(&mut resources.itm.stim[0], "{} {}", frame.channels[0],  frame.channels[1]);
     }
 
-    #[idle(resources=[itm,serial])]
+    #[idle(resources=[itm])]
     fn idle() -> ! {
         loop {
         }
