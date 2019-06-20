@@ -16,6 +16,8 @@ extern crate rflibs;
 
 use rtfm::app;
 use hal::serial;
+use hal::gpio;
+use hal::gpio::gpiod;
 use hal::prelude::*;
 use rflibs::sbus;
 
@@ -26,6 +28,11 @@ pub mod uarts;
 const APP: () = {
     static mut sbus_state: sbus::SbusReadState = ();
     static mut sbus_frame: sbus::SbusFrame = ();
+
+    static mut led_green:  gpiod::PD12<gpio::Output<gpio::PushPull>> = ();
+    static mut led_orange: gpiod::PD13<gpio::Output<gpio::PushPull>> = ();
+    static mut led_red:    gpiod::PD14<gpio::Output<gpio::PushPull>> = ();
+    static mut led_blue:   gpiod::PD15<gpio::Output<gpio::PushPull>> = ();
 
     static mut serial2 : uarts::Serial2 = ();
     static mut serial3 : uarts::Serial3 = ();
@@ -68,6 +75,10 @@ const APP: () = {
         serial3_.listen(serial::Event::Txe);
         serial3_.listen(serial::Event::Rxne);
 
+        led_green = gpiod.pd12.into_push_pull_output();
+        led_orange = gpiod.pd13.into_push_pull_output();
+        led_red = gpiod.pd14.into_push_pull_output();
+        led_blue = gpiod.pd15.into_push_pull_output();
         serial2 = serial2_;
         serial3 = serial3_;
         itm = core.ITM;
@@ -75,24 +86,30 @@ const APP: () = {
         sbus_frame = sbus::SbusFrame::default();
     }
 
-    #[interrupt(resources=[serial2,sbus_state,sbus_frame], spawn=[], priority=2)]
+    #[interrupt(resources=[serial2,sbus_state,sbus_frame,led_green], spawn=[], priority=2)]
     fn USART2() {
+        resources.led_green.set_high();
         match rx_sbus(resources.serial2, &mut resources.sbus_state) {
-          Some(frame) => {
-            *resources.sbus_frame = frame;
-          },
-          None => ()
+            Some(frame) => {
+                *resources.sbus_frame = frame;
+            },
+            None => ()
         }
+        resources.led_green.set_low();
     }
 
-    #[interrupt(resources=[serial3], spawn=[], priority=2)]
+    #[interrupt(resources=[serial3,led_blue], spawn=[], priority=2)]
     fn USART3() {
-      serial_echo(resources.serial3)
+        resources.led_blue.set_high();
+        serial_echo(resources.serial3);
+        resources.led_blue.set_low();
     }
 
-    #[idle(resources=[])]
+    #[idle(resources=[led_red])]
     fn idle() -> ! {
         loop {
+            resources.led_red.set_high();
+            resources.led_red.set_low();
         }
     }
 
