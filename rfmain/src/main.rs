@@ -26,8 +26,8 @@ pub mod uarts;
 
 #[app(device = stm32f4::stm32f407)]
 const APP: () = {
-    static mut sbus_state: sbus::SbusReadState = ();
-    static mut sbus_frame: sbus::SbusFrame = ();
+    static mut sbus_state: sbus::ReadState = ();
+    static mut sbus_frame: sbus::Frame = ();
 
     static mut led_green:  gpiod::PD12<gpio::Output<gpio::PushPull>> = ();
     static mut led_orange: gpiod::PD13<gpio::Output<gpio::PushPull>> = ();
@@ -82,8 +82,8 @@ const APP: () = {
         serial2 = serial2_;
         serial3 = serial3_;
         itm = core.ITM;
-        sbus_state = sbus::SbusReadState::default();
-        sbus_frame = sbus::SbusFrame::default();
+        sbus_state = sbus::ReadState::default();
+        sbus_frame = sbus::Frame::default();
     }
 
     #[interrupt(resources=[serial2,sbus_state,sbus_frame,led_green], spawn=[], priority=2)]
@@ -119,7 +119,7 @@ const APP: () = {
     }
 };
 
-fn rx_sbus(s: &mut uarts::SerialRW, sbus_state: &mut sbus::SbusReadState) -> Option<sbus::SbusFrame> {
+fn rx_sbus(s: &mut uarts::SerialRW, sbus_state: &mut sbus::ReadState) -> Option<sbus::Frame> {
   if s.is_idle() {
     sbus::process_idle(sbus_state);
   }

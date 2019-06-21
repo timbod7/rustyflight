@@ -1,5 +1,5 @@
 #[derive(Default,Clone)]
-pub struct SbusFrame {
+pub struct Frame {
     pub channels: [u16; 16],
     pub channel17: bool,
     pub channel18: bool,
@@ -8,20 +8,20 @@ pub struct SbusFrame {
 }
 
 #[derive(Default)]
-pub struct SbusReadState {
+pub struct ReadState {
     pub bytei: u16,
-    pub frame: SbusFrame,
+    pub frame: Frame,
 }
 
-pub fn process_idle(state: &mut SbusReadState) {
-    *state = SbusReadState::default();
+pub fn process_idle(state: &mut ReadState) {
+    *state = ReadState::default();
 }
 
-pub fn process_char(state: &mut SbusReadState, c: u8) -> bool {
+pub fn process_char(state: &mut ReadState, c: u8) -> bool {
     if state.bytei == 0 {
         if c == 0x0f {
              state.bytei = state.bytei + 1;
-             state.frame = SbusFrame::default();
+             state.frame = Frame::default();
         }
         false
     } else if state.bytei < 23 {
@@ -57,7 +57,7 @@ mod tests {
 
   #[test]
   fn starts_empty() {
-      let ss = SbusReadState::default();
+      let ss = ReadState::default();
       assert_eq!(ss.bytei, 0);
   }
 

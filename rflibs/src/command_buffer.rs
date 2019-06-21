@@ -2,14 +2,14 @@ use core::str;
 
 const BUFFER_SIZE:usize = 100;
 
-pub struct BufferState {
+pub struct State {
   array: [u8; BUFFER_SIZE],
   length: usize,
   insert: usize
 }
 
 
-impl BufferState {
+impl State {
   pub fn process(&mut self, c:char) -> () {
     if c == '\x01' {
       self.mvstart();
@@ -98,8 +98,8 @@ impl BufferState {
     str::from_utf8(&self.array[0..self.length]).unwrap()
   }
 
-  pub fn init() -> BufferState {
-    BufferState {
+  pub fn init() -> State {
+    State {
       array: [0;BUFFER_SIZE],
       length: 0,
       insert: 0
@@ -113,7 +113,7 @@ impl BufferState {
 mod tests {
   use super::*;
 
-  fn insert(cs: &mut BufferState, s : &str) {
+  fn insert(cs: &mut State, s : &str) {
     for c in s.chars() {
       cs.insert(c);
     }
@@ -121,13 +121,13 @@ mod tests {
 
   #[test]
   fn starts_empty() {
-      let cs = BufferState::init();
+      let cs = State::init();
       assert_eq!(cs.content(), "");
   }
 
   #[test]
   fn move_left() {
-    let mut cs = BufferState::init();
+    let mut cs = State::init();
     insert(&mut cs, "abcd");
     cs.mvleft();
     cs.mvleft();
@@ -142,7 +142,7 @@ mod tests {
 
   #[test]
   fn move_right() {
-    let mut cs = BufferState::init();
+    let mut cs = State::init();
     insert(&mut cs, "abcd");
     cs.mvleft();
     cs.mvleft();
@@ -159,7 +159,7 @@ mod tests {
 
   #[test]
   fn repeated_inserts() {
-    let mut cs = BufferState::init();
+    let mut cs = State::init();
     insert(&mut cs, "abc");
     assert_eq!(cs.content(), "abc");
 
@@ -175,7 +175,7 @@ mod tests {
 
   #[test]
   fn deletes() {
-    let mut cs = BufferState::init();
+    let mut cs = State::init();
     insert(&mut cs, "abcd");
     cs.mvleft();
     cs.mvleft();
@@ -189,7 +189,7 @@ mod tests {
 
   #[test]
   fn backspaces() {
-    let mut cs = BufferState::init();
+    let mut cs = State::init();
     insert(&mut cs, "abcd");
     cs.backspace();
     assert_eq!(cs.content(), "abc");
@@ -203,7 +203,7 @@ mod tests {
 
   #[test]
   fn split() {
-    let mut cs = BufferState::init();
+    let mut cs = State::init();
     insert(&mut cs, "load from file");
     let mut iter = cs.content().split_whitespace();
     assert_eq!(Some("load"), iter.next());
