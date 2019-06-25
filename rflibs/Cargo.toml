@@ -4,7 +4,11 @@ version = "0.1.0"
 authors = ["Tim Docker <tim@dockerz.net>"]
 edition = "2018"
 
-[dependencies]
+[dependencies.heapless]
+version = "0.4.4"
+
+[dependencies.typenum]
+version = "1.10.0"
 
 [features]
 std = []

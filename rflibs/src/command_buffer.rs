@@ -1,15 +1,18 @@
 use core::str;
+use heapless::Vec;
+use typenum::Unsigned;
 
-const BUFFER_SIZE:usize = 100;
-
-pub struct State {
-  array: [u8; BUFFER_SIZE],
-  length: usize,
+pub struct State<USIZE>
+  where USIZE: heapless::ArrayLength<u8>
+{
+  vec: Vec<u8, USIZE>,
   insert: usize
 }
 
 
-impl State {
+impl<USIZE> State<USIZE>
+  where USIZE: heapless::ArrayLength<u8>
+{
   pub fn process(&mut self, c:char) -> () {
     if c == '\x01' {
       self.mvstart();
@@ -44,67 +47,67 @@ impl State {
     let mut b = [0; 4];
     c.encode_utf8(&mut b);
 
-    if self.length < self.array.len() {
-      self.array[self.insert..self.length+1].rotate_right(1);
-      self.array[self.insert] = b[0];
-      self.insert += 1;
-      self.length += 1
+    match self.vec.push(0) {
+      Err(_) => return,
+      Ok(_) => ()
     }
-  }
-
-  fn mvstart(&mut self) -> () {
-    self.insert = 0;
-  }
-
-  fn mvend(&mut self) -> () {
-    self.insert = self.length;
-  }
-
-  fn deleteend(&mut self) -> () {
-    self.length = self.insert;
-  }
-
-  fn mvleft(&mut self) -> () {
-    if self.insert > 0 {
-      self.insert = self.insert - 1;
+    for i in (self.insert..self.vec.len()-1).rev() {
+      self.vec[i+1] = self.vec[i];
     }
+    self.vec[self.insert] = b[0];
+    self.insert += 1;
   }
 
-  fn mvright(&mut self) -> () {
-    if self.insert < self.length {
-      self.insert = self.insert + 1;
-    }
-  }
-
-  fn delete(&mut self) -> () {
-    if self.insert < self.length {
-      self.array[self.insert..self.length].rotate_left(1);
-      self.length -= 1;
-    }
-  }
-
-  fn backspace(&mut self) -> () {
-    if self.insert > 0 && self.insert <= self.length {
-      if self.insert != self.length {
-        self.array[self.insert-1..self.length].rotate_left(1);
-      }
-      self.insert -= 1;
-      self.length -= 1;
-    }
-  }
-
-
-  pub fn content(&self) -> &str {
-    str::from_utf8(&self.array[0..self.length]).unwrap()
-  }
-
-  pub fn init() -> State {
-    State {
-      array: [0;BUFFER_SIZE],
-      length: 0,
-      insert: 0
-    }
-  }
+   fn mvstart(&mut self) -> () {
+     self.insert = 0;
+   }
+ 
+   fn mvend(&mut self) -> () {
+     self.insert = self.vec.len();
+   }
+ 
+   fn deleteend(&mut self) -> () {
+     let _ = self.vec.resize(self.insert, 0);
+   }
+ 
+   fn mvleft(&mut self) -> () {
+     if self.insert > 0 {
+       self.insert = self.insert - 1;
+     }
+   }
+ 
+   fn mvright(&mut self) -> () {
+     if self.insert < self.vec.len() {
+       self.insert = self.insert + 1;
+     }
+   }
+ 
+   fn delete(&mut self) -> () {
+     if self.insert < self.vec.len() {
+       for i in self.insert..self.vec.len()-1 {
+         self.vec[i] = self.vec[i+1];
+       }
+       self.vec.pop();
+     }
+   }
+ 
+   fn backspace(&mut self) -> () {
+     if self.insert > 0 {
+       self.insert -= 1;
+       self.delete();
+     }
+   }
+ 
+   pub fn content(&self) -> &str {
+     str::from_utf8(&self.vec[0..self.vec.len()]).unwrap()
+   }
+ 
+   pub fn init() -> State<USIZE> {
+     State {
+       vec: Vec::new(),
+       insert: 0
+     }
+   }
 }
 
 
@@ -112,8 +115,11 @@ impl State {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use heapless::consts::U128 as SZ;
 
-  fn insert(cs: &mut State, s : &str) {
+  fn insert<USIZE>(cs: &mut State<USIZE>, s : &str)
+    where USIZE: heapless::ArrayLength<u8>
+  {
     for c in s.chars() {
       cs.insert(c);
     }
@@ -121,13 +127,13 @@ mod tests {
 
   #[test]
   fn starts_empty() {
-      let cs = State::init();
+      let cs : State<SZ> = State::init();
       assert_eq!(cs.content(), "");
   }
 
   #[test]
   fn move_left() {
-    let mut cs = State::init();
+    let mut cs : State<SZ> = State::init();
     insert(&mut cs, "abcd");
     cs.mvleft();
     cs.mvleft();
@@ -142,7 +148,7 @@ mod tests {
 
   #[test]
   fn move_right() {
-    let mut cs = State::init();
+    let mut cs : State<SZ> = State::init();
     insert(&mut cs, "abcd");
     cs.mvleft();
     cs.mvleft();
@@ -159,15 +165,15 @@ mod tests {
 
   #[test]
   fn repeated_inserts() {
-    let mut cs = State::init();
+    let mut cs : State<SZ> = State::init();
     insert(&mut cs, "abc");
     assert_eq!(cs.content(), "abc");
 
-    for _i in 0..BUFFER_SIZE+10 {
+    for _i in 0..SZ::to_usize()+10 {
       cs.insert('_');
     }
     let mut expected = String::from("abc");
-    for _i in 0..BUFFER_SIZE - 3 {
+    for _i in 0..SZ::to_usize() - 3 {
       expected.push('_');
     }
     assert_eq!(cs.content(), expected);
@@ -175,7 +181,7 @@ mod tests {
 
   #[test]
   fn deletes() {
-    let mut cs = State::init();
+    let mut cs : State<SZ> = State::init();
     insert(&mut cs, "abcd");
     cs.mvleft();
     cs.mvleft();
@@ -189,7 +195,7 @@ mod tests {
 
   #[test]
   fn backspaces() {
-    let mut cs = State::init();
+    let mut cs : State<SZ> = State::init();
     insert(&mut cs, "abcd");
     cs.backspace();
     assert_eq!(cs.content(), "abc");
@@ -203,7 +209,7 @@ mod tests {
 
   #[test]
   fn split() {
-    let mut cs = State::init();
+    let mut cs : State <SZ> = State::init();
     insert(&mut cs, "load from file");
     let mut iter = cs.content().split_whitespace();
     assert_eq!(Some("load"), iter.next());
