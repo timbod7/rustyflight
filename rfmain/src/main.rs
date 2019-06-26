@@ -13,6 +13,7 @@ extern crate embedded_hal;
 extern crate nb;
 
 extern crate rflibs;
+extern crate heapless;
 
 use rtfm::app;
 use hal::serial;
@@ -20,8 +21,10 @@ use hal::gpio;
 use hal::gpio::gpiod;
 use hal::prelude::*;
 use rflibs::sbus;
+use heapless::consts::U32;
 
 pub mod uarts;
+pub mod serialui;
 
 
 #[app(device = stm32f4::stm32f407)]
@@ -29,13 +32,14 @@ const APP: () = {
     static mut sbus_state: sbus::ReadState = ();
     static mut sbus_frame: sbus::Frame = ();
 
+    static mut serial_ui : serialui::SerialUi<uarts::Serial3,U32,U32> = ();
+
     static mut led_green:  gpiod::PD12<gpio::Output<gpio::PushPull>> = ();
     static mut led_orange: gpiod::PD13<gpio::Output<gpio::PushPull>> = ();
     static mut led_red:    gpiod::PD14<gpio::Output<gpio::PushPull>> = ();
     static mut led_blue:   gpiod::PD15<gpio::Output<gpio::PushPull>> = ();
 
     static mut serial2 : uarts::Serial2 = ();
-    static mut serial3 : uarts::Serial3 = ();
     static mut itm : stm32f4::stm32f407::ITM = ();
 
     #[init]
@@ -80,10 +84,10 @@ const APP: () = {
         led_red = gpiod.pd14.into_push_pull_output();
         led_blue = gpiod.pd15.into_push_pull_output();
         serial2 = serial2_;
-        serial3 = serial3_;
         itm = core.ITM;
         sbus_state = sbus::ReadState::default();
         sbus_frame = sbus::Frame::default();
+        serial_ui = serialui::SerialUi::init(serial3_);
     }
 
     #[interrupt(resources=[serial2,sbus_state,sbus_frame,led_green], spawn=[], priority=2)]
@@ -98,10 +102,10 @@ const APP: () = {
         resources.led_green.set_low();
     }
 
-    #[interrupt(resources=[serial3,led_blue], spawn=[], priority=2)]
+    #[interrupt(resources=[serial_ui,led_blue], spawn=[], priority=2)]
     fn USART3() {
         resources.led_blue.set_high();
-        serial_echo(resources.serial3);
+        resources.serial_ui.on_event();
         resources.led_blue.set_low();
     }
 
@@ -139,18 +143,3 @@ fn rx_sbus(s: &mut uarts::SerialRW, sbus_state: &mut sbus::ReadState) -> Option<
     },
   }
 }
-
-
-fn serial_echo(s: &mut uarts::SerialRW) {
-  match block!(s.read()) {
-    Ok(c) => {
-      match block!(s.write(c)) {
-        Ok(()) => (),
-        Err(_e) => ()
-      }
-    },
-    Err(_e) => {
-    },
-  }
-}
-
